@@ -101,6 +101,24 @@ def stand_still(
     return reward
 
 
+def stand_still_without_cmd(
+    env: ManagerBasedRLEnv,
+    command_name: str,
+    command_threshold: float = 0.1,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Penalize deviations from default joint positions only when command is (near) zero.
+
+    This mirrors the behavior referenced by env.yaml (stand_still_without_cmd) and is equivalent
+    to ``stand_still`` with a configurable threshold. It multiplies by a gravity-alignment gate
+    to reduce reward contribution when the robot is not upright.
+    """
+    reward = mdp.joint_deviation_l1(env, asset_cfg)
+    reward *= torch.linalg.norm(env.command_manager.get_command(command_name), dim=1) < command_threshold
+    reward *= torch.clamp(-env.scene["robot"].data.projected_gravity_b[:, 2], 0, 0.7) / 0.7
+    return reward
+
+
 def joint_pos_penalty(
     env: ManagerBasedRLEnv,
     command_name: str,
